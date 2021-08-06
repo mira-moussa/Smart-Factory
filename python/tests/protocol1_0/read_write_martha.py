@@ -1,0 +1,120 @@
+from dynamixel_sdk import *                    # Uses Dynamixel SDK library
+import time                                    # for time delay
+
+# Control table address
+ADDR_RX_TORQUE_ENABLE = 24               # Control table address is different in Dynamixel model
+ADDR_RX_GOAL_POSITION = 30               # addres of goal position register
+ADDR_RX_PRESENT_POSITION = 36            # addres of present position register
+ADDR_RX_PRESENT_SPEED = 38               # addres of present speed register
+
+# Protocol version
+PROTOCOL_VERSION = 1.0               # See which protocol version is used in the Dynamixel
+BAUDRATE = 57600             # Dynamixel default baudrate : 57600
+DEVICENAME = 'COM4'    # Check which port is being used on your controller "/dev/ttyS0"
+# ex) Windows: "COM1"   Linux: "/dev/ttyUSB0" Mac: "/dev/tty.usbserial-*"
+
+TORQUE_ENABLE = 1                # Value for enabling the torque
+TORQUE_DISABLE = 0                 # Value for disabling the torque
+
+
+ID_INDEX = 0                        # index for iteration of different dxl Id
+POS_INDEX = 0                       # index for looping over differnt poditions
+SPEED_INDEX = 0                     # index for looping over different speeds
+
+#DXL_ID = [1, 2]                  # used dxl ID
+DXL_ID = [1, 2, 3]                  # used dxl ID
+DXL_GOAL_POSITION = [100, 1000]   # array of goal pos for every dxl
+#dxl_goal_speed = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]  # speed profile
+dxl_goal_speed = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+dt = 0.01
+speed = 50
+v= 20
+for i in range(10):
+    if i > 4:
+        dxl_goal_speed[i] = speed - v
+        speed = speed - v
+    elif i <= 4:
+        dxl_goal_speed[i] = speed + v
+        speed = speed + v
+# Initialize PortHandler instance #Set the port path # Get methods and members of PortHandlerLinux or PortHandlerWindows
+portHandler = PortHandler(DEVICENAME)
+
+# Initialize PacketHandler instance #Set the protocol version
+# #Get methods and members of Protocol1PacketHandler or Protocol2PacketHandler
+packetHandler = PacketHandler(PROTOCOL_VERSION)
+
+# Open port
+if portHandler.openPort():
+    print("Succeeded to open the port")
+else:
+    print("Failed to open the port")
+    print("Press any key to terminate...")
+    quit()
+
+
+# Set port baudrate
+if portHandler.setBaudRate(BAUDRATE):
+    print("Succeeded to change the baudrate")
+else:
+    print("Failed to change the baudrate")
+    print("Press any key to terminate...")
+    quit()
+for i in range(3):
+    # Enable Dynamixel Torque
+    dxl_comm_result, dxl_error = packetHandler.write1ByteTxRx(portHandler, DXL_ID[i], ADDR_RX_TORQUE_ENABLE, TORQUE_ENABLE)
+    if dxl_comm_result != COMM_SUCCESS:
+        print("%s" % packetHandler.getTxRxResult(dxl_comm_result))
+    elif dxl_error != 0:
+        print("%s" % packetHandler.getRxPacketError(dxl_error))
+    else:
+        print("Dynamixel:%03d has been successfully connected", DXL_ID[i])
+n = 0
+while 1:
+    for i in range(3):
+        # Write dxl1 goal position
+        dxl_comm_result, dxl_error = packetHandler.write4ByteTxRx(portHandler, DXL_ID[i], ADDR_RX_GOAL_POSITION, DXL_GOAL_POSITION[POS_INDEX], dxl_goal_speed[SPEED_INDEX])
+
+        if dxl_comm_result != COMM_SUCCESS:
+            print("%s" % packetHandler.getTxRxResult(dxl_comm_result))
+        elif dxl_error != 0:
+            print("%s" % packetHandler.getRxPacketError(dxl_error))
+
+    time.sleep(dt)
+    """"
+    # Read present speed
+    for i in range(3):
+        dxl_present_speed, dxl_comm_result, dxl_error,data = packetHandler.read10ByteTxRx(portHandler, DXL_ID[i],
+                                                                                     ADDR_RX_PRESENT_SPEED)
+
+        if dxl_comm_result != COMM_SUCCESS:
+            print("%s" % packetHandler.getTxRxResult(dxl_comm_result))
+        elif dxl_error != 0:
+            print("%s" % packetHandler.getRxPacketError(dxl_error))
+
+        print("[ID:%03d] GoalSpeed:%03d  PresSpeed:%03d" % (DXL_ID[i], dxl_goal_speed[SPEED_INDEX], dxl_present_speed))
+    """
+    SPEED_INDEX = SPEED_INDEX + 1
+    if SPEED_INDEX == 10:
+        SPEED_INDEX = 0
+        if POS_INDEX == 0:
+            POS_INDEX = 1
+            time.sleep(1.0)
+        else:
+            POS_INDEX = 0
+
+        n = n + 1
+        if n == 1:
+            break
+
+for i in range(3):
+    # Disable Dynamixel Torque
+    dxl_comm_result, dxl_error= packetHandler.write1ByteTxRx(portHandler, DXL_ID[i], ADDR_RX_TORQUE_ENABLE,
+                                                              TORQUE_DISABLE)
+    if dxl_comm_result != COMM_SUCCESS:
+        print("%s" % packetHandler.getTxRxResult(dxl_comm_result))
+    elif dxl_error != 0:
+        print("%s" % packetHandler.getRxPacketError(dxl_error))
+
+
+# Close port
+portHandler.closePort()
